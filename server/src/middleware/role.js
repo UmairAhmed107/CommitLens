@@ -1,4 +1,4 @@
-// Role-based access control middleware (FR-AUTH-03)
+const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Requirement = require('../models/Requirement');
 const TestCase = require('../models/TestCase');
@@ -18,13 +18,19 @@ async function resolveProjectId(req) {
 
   // If modifying a requirement by :rid
   if (req.params.rid) {
-    const reqDoc = await Requirement.findById(req.params.rid);
+    const isObjectId = mongoose.isValidObjectId(req.params.rid);
+    const reqDoc = isObjectId
+      ? await Requirement.findById(req.params.rid)
+      : await Requirement.findOne({ reqId: req.params.rid });
     return reqDoc ? reqDoc.projectId : null;
   }
 
   // If modifying a test by :tid
   if (req.params.tid) {
-    const testDoc = await TestCase.findById(req.params.tid);
+    const isObjectId = mongoose.isValidObjectId(req.params.tid);
+    const testDoc = isObjectId
+      ? await TestCase.findById(req.params.tid)
+      : await TestCase.findOne({ testId: req.params.tid });
     return testDoc ? testDoc.projectId : null;
   }
 

@@ -1,5 +1,6 @@
 // Test Case Controller (FR-TST-01 to FR-TST-05)
 const testService = require('../services/testService');
+const requirementService = require('../services/requirementService');
 const { isNonEmptyString } = require('../middleware/validate');
 
 async function createTestCase(req, res, next) {
@@ -43,6 +44,15 @@ async function getTestCases(req, res, next) {
   }
 }
 
+async function getTestCase(req, res, next) {
+  try {
+    const testCase = await testService.getTestCaseById(req.params.tid);
+    return res.status(200).json(testCase);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateTestCase(req, res, next) {
   try {
     const testCase = await testService.updateTestCase(req.params.tid, req.body);
@@ -77,9 +87,31 @@ async function recordTestRun(req, res, next) {
   }
 }
 
+async function getTestRuns(req, res, next) {
+  try {
+    const runs = await testService.getTestRunsByTestCaseId(req.params.tid);
+    return res.status(200).json(runs);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getCoverage(req, res, next) {
+  try {
+    const coverage = await requirementService.getRequirementCoverage(req.params.id);
+    return res.status(200).json(coverage);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createTestCase,
   getTestCases,
+  getTestCase,
   updateTestCase,
-  recordTestRun
+  recordTestRun,
+  getTestRuns,
+  getCoverage
 };
+

@@ -1,8 +1,20 @@
 // Test Management Service (FR-TST-01 to FR-TST-05)
+const mongoose = require('mongoose');
 const TestCase = require('../models/TestCase');
 const TestRun = require('../models/TestRun');
 const Counter = require('../models/Counter');
 const Requirement = require('../models/Requirement');
+
+/**
+ * Finds a test case by either MongoDB ObjectId or by testId (e.g. 'TC-1')
+ */
+async function findTestCase(identifier) {
+  if (mongoose.isValidObjectId(identifier)) {
+    const doc = await TestCase.findById(identifier);
+    if (doc) return doc;
+  }
+  return TestCase.findOne({ testId: identifier });
+}
 
 /**
  * Create a new test case linked to one or more requirements (FR-TST-01, FR-TST-02)
@@ -59,7 +71,7 @@ async function getTestCases(projectId, { priority, status, requirementId, search
  * Update test case details or requirement links (FR-TST-02)
  */
 async function updateTestCase(testCaseId, updates) {
-  const testCase = await TestCase.findById(testCaseId);
+  const testCase = await findTestCase(testCaseId);
   if (!testCase) {
     const err = new Error('Test case not found');
     err.statusCode = 404;
@@ -90,7 +102,7 @@ async function updateTestCase(testCaseId, updates) {
  * Record test execution result, log to history, and clear needsRerun (FR-TST-03, FR-TST-04)
  */
 async function recordTestRun(testCaseId, { status, notes }, userId) {
-  const testCase = await TestCase.findById(testCaseId);
+  const testCase = await findTestCase(testCaseId);
   if (!testCase) {
     const err = new Error('Test case not found');
     err.statusCode = 404;
@@ -120,6 +132,7 @@ async function recordTestRun(testCaseId, { status, notes }, userId) {
   await testCase.populate('lastRunBy', 'name email');
 
   return {
+    ...testCase.toObject(),
     testCase,
     testRun
   };
@@ -136,10 +149,39 @@ async function getTestRuns(projectId, testId) {
   return runs;
 }
 
+/**
+ * Retrieve a single test case by ID
+ */
+async function getTestCaseById(testCaseId) {
+  const testCase = await findTestCase(testCaseId);
+  if (!testCase) {
+    const err = new Error('Test case not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return testCase;
+}
+
+/**
+ * Retrieve execution runs for a test case ID
+ */
+async function getTestRunsByTestCaseId(testCaseId) {
+  const testCase = await findTestCase(testCaseId);
+  if (!testCase) {
+    const err = new Error('Test case not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return getTestRuns(testCase.projectId, testCase.testId);
+}
+
 module.exports = {
   createTestCase,
   getTestCases,
+  getTestCaseById,
   updateTestCase,
   recordTestRun,
-  getTestRuns
+  getTestRuns,
+  getTestRunsByTestCaseId
 };
+

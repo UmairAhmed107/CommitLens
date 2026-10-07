@@ -1,11 +1,11 @@
-// Test Cases Management Page (FR-TST-01 to FR-TST-04, UI-07, UI-08, UI Spec 3.5)
+// Test Cases Management Page (FR-TST-01 to FR-TST-05, UI-07, UI-08, UI Spec 3.5)
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useProject } from '../context/ProjectContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
-import { Plus, Search, PlayCircle, Bug, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, PlayCircle, Bug, Trash2, CheckCircle2, History, Edit } from 'lucide-react';
 
 export default function TestCases() {
   const { activeProject, userRole } = useProject();
@@ -42,9 +42,11 @@ export default function TestCases() {
   const [runNotes, setRunNotes] = useState('');
   const [recordError, setRecordError] = useState('');
 
-  // Execution History Modal
-  const [historyRuns, setHistoryRuns] = useState([]);
+  // Execution History Modal State (FR-TST-04)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [activeTestForHistory, setActiveTestForHistory] = useState(null);
+  const [historyRuns, setHistoryRuns] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const fetchTests = async () => {
     if (!activeProject) return;
@@ -71,8 +73,11 @@ export default function TestCases() {
   };
 
   useEffect(() => {
-    fetchTests();
-  }, [activeProject, priorityFilter, statusFilter, needsRerunFilter]);
+    const timer = setTimeout(() => {
+      fetchTests();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeProject, priorityFilter, statusFilter, needsRerunFilter, search]);
 
   // Steps handling in form
   const addStep = () => {
@@ -108,6 +113,19 @@ export default function TestCases() {
       expectedResult: '',
       priority: 'Medium',
       requirementIds: []
+    });
+    setFormError('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (test) => {
+    setEditingTest(test);
+    setFormData({
+      title: test.title,
+      steps: test.steps?.length > 0 ? test.steps : [''],
+      expectedResult: test.expectedResult || '',
+      priority: test.priority || 'Medium',
+      requirementIds: test.requirementIds || []
     });
     setFormError('');
     setIsModalOpen(true);
@@ -160,7 +178,33 @@ export default function TestCases() {
     }
   };
 
+  // Open Execution History Modal (FR-TST-04)
+  const openHistoryModal = async (test) => {
+    setActiveTestForHistory(test);
+    setIsHistoryModalOpen(true);
+    setLoadingHistory(true);
+    try {
+      const res = await api.get(`/tests/${test._id}/runs`);
+      setHistoryRuns(res.data);
+    } catch (err) {
+      console.error('[Fetch History Error]', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const canEdit = userRole === 'QA';
+
+  if (!activeProject) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <h2 className="serif-heading">Test Cases</h2>
+        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+          Please select or create a project from the top bar to view test cases.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -242,29 +286,33 @@ export default function TestCases() {
         </div>
 
         {/* Table View (UI Spec 3.5) */}
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading test cases...
-          </div>
-        ) : tests.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No test cases found.
-          </div>
-        ) : (
-          <table data-testid="test-table">
-            <thead>
+        <table data-testid="test-table">
+          <thead>
+            <tr>
+              <th>Test ID</th>
+              <th>Title</th>
+              <th>Priority</th>
+              <th>Linked Requirements</th>
+              <th>Status</th>
+              <th>Impact Flag</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th>Test ID</th>
-                <th>Title</th>
-                <th>Priority</th>
-                <th>Linked Requirements</th>
-                <th>Status</th>
-                <th>Impact Flag</th>
-                <th>Actions</th>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  Loading test cases...
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {tests.map((t) => (
+            ) : tests.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  No test cases found.
+                </td>
+              </tr>
+            ) : (
+              tests.map((t) => (
                 <tr key={t._id} data-testid={`test-row-${t.testId}`}>
                   <td style={{ fontWeight: 600 }}>{t.testId}</td>
                   <td>
@@ -319,6 +367,30 @@ export default function TestCases() {
                         </button>
                       )}
 
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => openEditModal(t)}
+                          data-testid={`edit-${t.testId}`}
+                          title="Edit Test Case"
+                        >
+                          <Edit size={14} />
+                          <span>Edit</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openHistoryModal(t)}
+                        data-testid={`history-btn-${t.testId}`}
+                        title="View Execution History"
+                      >
+                        <History size={14} />
+                        <span>History</span>
+                      </button>
+
                       {/* If test failed, show Create Bug button (FR-BUG-01, UI-13) */}
                       {t.status === 'Failed' && canEdit && (
                         <button
@@ -335,10 +407,10 @@ export default function TestCases() {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Create / Edit Test Modal (FR-TST-01, FR-TST-02) */}
@@ -355,12 +427,13 @@ export default function TestCases() {
 
         <form onSubmit={handleFormSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="test-title">Title</label>
+            <label className="form-label" htmlFor="test-modal-title">Title</label>
             <input
-              id="test-title"
+              id="test-modal-title"
               type="text"
               className="form-input"
-              data-testid="test-title"
+              data-testid="test-modal-title"
+              name="test-title"
               placeholder="e.g. Verify Login with Invalid Password"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -405,12 +478,12 @@ export default function TestCases() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="test-expected">Expected Result</label>
+            <label className="form-label" htmlFor="test-modal-expected">Expected Result</label>
             <textarea
-              id="test-expected"
+              id="test-modal-expected"
               rows={2}
               className="form-textarea"
-              data-testid="test-expected"
+              data-testid="test-modal-expected"
               placeholder="e.g. Error message appears and login is denied"
               value={formData.expectedResult}
               onChange={(e) => setFormData({ ...formData, expectedResult: e.target.value })}
@@ -418,11 +491,11 @@ export default function TestCases() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="test-priority">Priority</label>
+            <label className="form-label" htmlFor="test-modal-priority">Priority</label>
             <select
-              id="test-priority"
+              id="test-modal-priority"
               className="form-select"
-              data-testid="test-priority"
+              data-testid="test-modal-priority"
               value={formData.priority}
               onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
             >
@@ -465,7 +538,8 @@ export default function TestCases() {
             <button
               type="submit"
               className="btn btn-primary"
-              data-testid="test-submit"
+              data-testid="test-modal-submit"
+              id="test-submit"
             >
               Save Test Case
             </button>
@@ -485,13 +559,14 @@ export default function TestCases() {
           </div>
         )}
 
-        <form onSubmit={handleRecordSubmit}>
+        <form onSubmit={handleRecordSubmit} data-testid="record-result-form">
           <div className="form-group">
-            <label className="form-label" htmlFor="run-status">Execution Status</label>
+            <label className="form-label" htmlFor="record-modal-status">Execution Status</label>
             <select
-              id="run-status"
+              id="record-modal-status"
               className="form-select"
               data-testid="run-status"
+              name="record-modal-status"
               value={runStatus}
               onChange={(e) => setRunStatus(e.target.value)}
             >
@@ -503,12 +578,13 @@ export default function TestCases() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="run-notes">Notes / Observations</label>
+            <label className="form-label" htmlFor="record-modal-notes">Notes / Observations</label>
             <textarea
-              id="run-notes"
+              id="record-modal-notes"
               rows={3}
               className="form-textarea"
               data-testid="run-notes"
+              name="record-modal-notes"
               placeholder="e.g. Executed in Chrome v130. Observed response code 200."
               value={runNotes}
               onChange={(e) => setRunNotes(e.target.value)}
@@ -527,11 +603,62 @@ export default function TestCases() {
               type="submit"
               className="btn btn-primary"
               data-testid="run-submit"
+              id="record-modal-submit"
             >
               Save Result
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Execution History Modal (FR-TST-04) */}
+      <Modal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        title={`Execution History: ${activeTestForHistory?.testId}`}
+      >
+        <div data-testid="test-history-modal">
+          {loadingHistory ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading history...
+            </div>
+          ) : historyRuns.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No execution runs recorded yet for this test case.
+            </div>
+          ) : (
+            <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
+                    <th style={{ padding: '0.5rem' }}>Status</th>
+                    <th style={{ padding: '0.5rem' }}>Date</th>
+                    <th style={{ padding: '0.5rem' }}>Executed By</th>
+                    <th style={{ padding: '0.5rem' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRuns.map((run, i) => (
+                    <tr key={run._id || i} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '0.5rem' }}>
+                        <Badge status={run.status} />
+                      </td>
+                      <td style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        {new Date(run.executedAt).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '0.5rem' }}>
+                        {run.executedBy?.name || run.executedBy?.email || 'QA User'}
+                      </td>
+                      <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>
+                        {run.notes || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
