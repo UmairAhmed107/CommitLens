@@ -19,6 +19,7 @@
   "author": "SCIT Team",
   "license": "ISC",
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -28,6 +29,7 @@
     "minimatch": "^9.0.5",
     "mongodb-memory-server": "^10.1.2",
     "mongoose": "^8.8.2",
+    "octokit": "^5.0.5",
     "pdfkit": "^0.15.1"
   }
 }

@@ -1,9 +1,9 @@
 // GitHub and Repository Integration Service (FR-GIT-01 to FR-GIT-06)
 const crypto = require('crypto');
+const { Octokit } = require('@octokit/rest');
 const Repository = require('../models/Repository');
 const Commit = require('../models/Commit');
 const config = require('../config/env');
-const impactService = require('./impactService');
 
 /**
  * Encrypt a sensitive token using AES-256-CBC (FR-GIT-02)
@@ -80,7 +80,7 @@ async function connectRepository(projectId, { url, token, defaultBranch }) {
     });
   }
 
-  // Return repository details without the encrypted token
+  // Return repository details without the encrypted token (FR-GIT-02)
   const result = repo.toObject();
   delete result.tokenEncrypted;
   return result;
@@ -125,11 +125,7 @@ function getDemoShopCommits() {
       files: [
         { path: 'src/auth/LoginService.js', status: 'modified' },
         { path: 'README.md', status: 'modified' }
-      ],
-      contents: {
-        'src/auth/LoginService.js': '// @req REQ-01 Secure Login Service\nexport class LoginService {}',
-        'README.md': '# Demo Shop\nOnline e-commerce platform.'
-      }
+      ]
     },
     {
       sha: '9f8e7d6c5b4a3210fedcba9876543210fedcba98',
@@ -139,10 +135,7 @@ function getDemoShopCommits() {
       date: new Date(Date.now() - 3600000 * 12),
       files: [
         { path: 'src/cart/CartService.js', status: 'modified' }
-      ],
-      contents: {
-        'src/cart/CartService.js': '// Shopping Cart calculations'
-      }
+      ]
     },
     {
       sha: '4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d',
@@ -152,16 +145,13 @@ function getDemoShopCommits() {
       date: new Date(Date.now() - 3600000 * 24),
       files: [
         { path: 'docs/guide.md', status: 'modified' }
-      ],
-      contents: {
-        'docs/guide.md': '# Project Architecture Guide'
-      }
+      ]
     }
   ];
 }
 
 /**
- * Sync commits from GitHub or demo repository (FR-GIT-03, FR-GIT-04)
+ * Sync commits from GitHub using Octokit or demo repository (FR-GIT-03, FR-GIT-04)
  */
 async function syncCommits(projectId) {
   const repo = await Repository.findOne({ projectId }).select('+tokenEncrypted');
@@ -174,9 +164,8 @@ async function syncCommits(projectId) {
 
   const plainToken = repo.tokenEncrypted ? decryptToken(repo.tokenEncrypted) : '';
   let fetchedCommits = [];
-  const fileContentsMap = {};
 
-  // Check if live GitHub sync can be performed
+  // Check if live GitHub sync can be performed with Octokit
   const isLiveGitHub =
     plainToken &&
     plainToken !== 'demo' &&
@@ -187,55 +176,42 @@ async function syncCommits(projectId) {
 
   if (isLiveGitHub) {
     try {
-      console.log(`[GitHub Service] Fetching live commits from GitHub for ${repo.owner}/${repo.name}...`);
-      const response = await fetch(
-        `https://api.github.com/repos/${repo.owner}/${repo.name}/commits?per_page=15`,
-        {
-          headers: {
-            Authorization: `token ${plainToken}`,
-            Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'SCIT-Change-Impact-System'
-          }
-        }
-      );
+      console.log(`[GitHub Service] Fetching live commits with Octokit for ${repo.owner}/${repo.name}...`);
+      const octokit = new Octokit({
+        auth: plainToken,
+        userAgent: 'SCIT-Change-Impact-System'
+      });
 
-      if (response.ok) {
-        const ghCommits = await response.json();
-        // Fetch detailed commit files
-        for (const item of ghCommits) {
-          const detailRes = await fetch(
-            `https://api.github.com/repos/${repo.owner}/${repo.name}/commits/${item.sha}`,
-            {
-              headers: {
-                Authorization: `token ${plainToken}`,
-                Accept: 'application/vnd.github.v3+json',
-                'User-Agent': 'SCIT-Change-Impact-System'
-              }
-            }
-          );
-          if (detailRes.ok) {
-            const detail = await detailRes.json();
-            const files = (detail.files || []).map((f) => ({
-              path: f.filename,
-              status: f.status === 'removed' ? 'removed' : 'modified'
-            }));
+      const { data: ghCommits } = await octokit.rest.repos.listCommits({
+        owner: repo.owner,
+        repo: repo.name,
+        sha: repo.defaultBranch || 'main',
+        per_page: 20
+      });
 
-            fetchedCommits.push({
-              sha: item.sha,
-              message: item.commit.message,
-              author: item.commit.author ? item.commit.author.name : 'Unknown',
-              branch: repo.defaultBranch || 'main',
-              date: new Date(item.commit.author ? item.commit.author.date : Date.now()),
-              files
-            });
-          }
-        }
-      } else {
-        console.warn(`[GitHub Service] GitHub API responded with status ${response.status}. Using fallback demo commits.`);
-        fetchedCommits = getDemoShopCommits();
+      for (const item of ghCommits) {
+        const { data: detail } = await octokit.rest.repos.getCommit({
+          owner: repo.owner,
+          repo: repo.name,
+          ref: item.sha
+        });
+
+        const files = (detail.files || []).map((f) => ({
+          path: f.filename,
+          status: f.status === 'removed' ? 'removed' : (f.status === 'added' ? 'added' : 'modified')
+        }));
+
+        fetchedCommits.push({
+          sha: item.sha,
+          message: item.commit.message,
+          author: item.commit.author ? item.commit.author.name : (item.author ? item.author.login : 'Unknown'),
+          branch: repo.defaultBranch || 'main',
+          date: new Date(item.commit.author ? item.commit.author.date : Date.now()),
+          files
+        });
       }
     } catch (apiErr) {
-      console.warn(`[GitHub Service] Live fetch failed: ${apiErr.message}. Falling back to demo commits.`);
+      console.warn(`[GitHub Service] Octokit live fetch failed (${apiErr.message}). Using fallback demo commits.`);
       fetchedCommits = getDemoShopCommits();
     }
   } else {
@@ -245,6 +221,8 @@ async function syncCommits(projectId) {
 
   // Ingest commits into database (FR-GIT-04: Prevents duplicates by sha)
   const ingestedCommits = [];
+  let newCommitsCount = 0;
+
   for (const rawCommit of fetchedCommits) {
     // Check if commit already exists
     let commitDoc = await Commit.findOne({ projectId, sha: rawCommit.sha });
@@ -254,28 +232,24 @@ async function syncCommits(projectId) {
         sha: rawCommit.sha,
         message: rawCommit.message,
         author: rawCommit.author,
-        branch: rawCommit.branch || 'main',
+        branch: rawCommit.branch || repo.defaultBranch || 'main',
         date: rawCommit.date || new Date(),
         files: rawCommit.files || []
       });
+      newCommitsCount++;
     }
 
-    // Run impact analysis for the commit (FR-IMP-03)
-    await impactService.analyzeCommitImpact(
-      projectId,
-      commitDoc,
-      rawCommit.contents || {}
-    );
-
+    // Impact analysis deferred to FR-IMP (as instructed: "Do not run impact analysis yet")
     ingestedCommits.push(commitDoc);
   }
 
-  // Update repository lastSyncAt
+  // Update repository lastSyncAt (FR-GIT-03)
   repo.lastSyncAt = new Date();
   await repo.save();
 
   return {
     syncedCount: ingestedCommits.length,
+    newCommitsCount,
     lastSyncAt: repo.lastSyncAt,
     commits: ingestedCommits
   };
