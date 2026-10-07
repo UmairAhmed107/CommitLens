@@ -53,14 +53,18 @@ export default function Requirements() {
   };
 
   useEffect(() => {
-    fetchRequirements();
-  }, [activeProject, priorityFilter, statusFilter, typeFilter]);
+    const timer = setTimeout(() => {
+      fetchRequirements();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeProject, priorityFilter, statusFilter, typeFilter, search]);
 
-  // Handle Search on Submit or Debounce
+  // Handle Search on Submit
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     fetchRequirements();
   };
+
 
   const openCreateModal = () => {
     setEditingReq(null);
@@ -113,6 +117,14 @@ export default function Requirements() {
   };
 
   const canEdit = userRole === 'PM';
+
+  if (!activeProject) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <p style={{ color: 'var(--text-muted)' }}>No active project selected. Please choose or create a project from the top bar.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -176,6 +188,7 @@ export default function Requirements() {
               <option value="Active">Active</option>
               <option value="Draft">Draft</option>
               <option value="In Review">In Review</option>
+              <option value="Approved">Approved</option>
               <option value="Implemented">Implemented</option>
             </select>
 
@@ -195,31 +208,35 @@ export default function Requirements() {
         </div>
 
         {/* Requirements Table (UI Spec 3.4) */}
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading requirements...
-          </div>
-        ) : requirements.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No requirements match the current filters.
-          </div>
-        ) : (
-          <table data-testid="req-table">
-            <thead>
+        <table data-testid="req-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Ver</th>
+              <th>Linked Tests</th>
+              <th>Coverage</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Ver</th>
-                <th>Linked Tests</th>
-                <th>Coverage</th>
-                <th>Actions</th>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  Loading requirements...
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {requirements.map((req) => (
+            ) : requirements.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  No requirements match the current filters.
+                </td>
+              </tr>
+            ) : (
+              requirements.map((req) => (
                 <tr key={req._id} data-testid={`req-row-${req.reqId}`}>
                   <td style={{ fontWeight: 600 }}>{req.reqId}</td>
                   <td>
@@ -234,7 +251,7 @@ export default function Requirements() {
                   <td><Badge status={req.priority} /></td>
                   <td><Badge status={req.status} /></td>
                   <td>v{req.version}</td>
-                  <td>{req.linkedTestsCount} tests</td>
+                  <td>{req.linkedTestsCount || 0} tests</td>
                   <td>
                     <Badge
                       status={req.coverageState}
@@ -247,6 +264,7 @@ export default function Requirements() {
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => setSelectedReq(req)}
+                        data-testid={`view-${req.reqId}`}
                         title="View details & version history"
                       >
                         <Eye size={14} />
@@ -264,11 +282,12 @@ export default function Requirements() {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
+
 
       {/* Create / Edit Modal (FR-REQ-01, FR-REQ-03) */}
       <Modal
@@ -379,7 +398,7 @@ export default function Requirements() {
 
       {/* Detail Drawer: Shows Linked Tests & Version History (FR-REQ-03, FR-REQ-05) */}
       {selectedReq && (
-        <div className="drawer-overlay" onClick={() => setSelectedReq(null)}>
+        <div className="drawer-overlay" onClick={() => setSelectedReq(null)} data-testid="req-drawer">
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
@@ -392,9 +411,21 @@ export default function Requirements() {
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setSelectedReq(null)}
+                data-testid="req-drawer-close"
               >
                 Close
               </button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <span className="form-label">Type & Priority</span>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <span className="brand-badge" style={{ background: '#F3F4F6', color: '#374151', textTransform: 'capitalize' }}>
+                  {selectedReq.type}
+                </span>
+                <Badge status={selectedReq.priority} />
+                <Badge status={selectedReq.status} />
+              </div>
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -404,14 +435,15 @@ export default function Requirements() {
               </p>
             </div>
 
-            {/* Linked Test Cases */}
-            <div style={{ marginBottom: '2rem' }}>
+            {/* Linked Test Cases (FR-REQ-05) */}
+            <div style={{ marginBottom: '2rem' }} data-testid="req-linked-tests">
               <span className="form-label">Linked Test Cases ({selectedReq.linkedTests?.length || 0})</span>
               {selectedReq.linkedTests && selectedReq.linkedTests.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                   {selectedReq.linkedTests.map((t) => (
                     <div
                       key={t.testId}
+                      data-testid={`linked-test-${t.testId}`}
                       style={{
                         padding: '0.75rem',
                         background: 'var(--bg-card)',
@@ -431,22 +463,23 @@ export default function Requirements() {
                   ))}
                 </div>
               ) : (
-                <p style={{ fontSize: '0.85rem', color: '#DC2626', marginTop: '0.5rem' }}>
+                <p style={{ fontSize: '0.85rem', color: '#DC2626', marginTop: '0.5rem' }} data-testid="uncovered-notice">
                   Uncovered: No test cases are currently linked to this requirement.
                 </p>
               )}
             </div>
 
             {/* Version History (FR-REQ-03, MT-02) */}
-            <div>
+            <div data-testid="req-history-list">
               <span className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <History size={15} /> Version History
+                <History size={15} /> Version History ({selectedReq.version} versions)
               </span>
               {selectedReq.history && selectedReq.history.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                   {selectedReq.history.map((hist, idx) => (
                     <div
                       key={idx}
+                      data-testid={`history-version-${hist.version}`}
                       style={{
                         padding: '0.75rem',
                         background: 'var(--bg-card)',
@@ -455,17 +488,21 @@ export default function Requirements() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                        <span>Version {hist.version}</span>
+                        <strong>Version {hist.version}</strong>
                         <span>{new Date(hist.modifiedAt).toLocaleString()}</span>
                       </div>
                       <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{hist.title}</span>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{hist.description}</p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0' }}>{hist.description}</p>
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Status: {hist.status}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>• Priority: {hist.priority}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                  Initial version (v1). No previous revisions.
+                  Initial version (v1). No previous revisions recorded.
                 </p>
               )}
             </div>
@@ -475,3 +512,4 @@ export default function Requirements() {
     </div>
   );
 }
+

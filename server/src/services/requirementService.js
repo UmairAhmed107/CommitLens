@@ -22,8 +22,14 @@ async function createRequirement(projectId, { title, description, type, priority
     history: []
   });
 
-  return requirement;
+  return {
+    ...requirement.toObject(),
+    linkedTests: [],
+    linkedTestsCount: 0,
+    coverageState: 'uncovered'
+  };
 }
+
 
 /**
  * List requirements with search and filter capabilities, enriched with linked tests and coverage state (FR-REQ-04, FR-REQ-05)
@@ -167,9 +173,35 @@ async function getRequirementCoverage(projectId) {
   };
 }
 
+/**
+ * Get detailed requirement by ID with linked tests and history
+ */
+async function getRequirementById(requirementId) {
+  const requirement = await Requirement.findById(requirementId).populate('history.modifiedBy', 'name email');
+  if (!requirement) {
+    const err = new Error('Requirement not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const linkedTests = await TestCase.find({
+    projectId: requirement.projectId,
+    requirementIds: requirement.reqId
+  }).select('testId title priority status needsRerun');
+
+  return {
+    ...requirement.toObject(),
+    linkedTests,
+    linkedTestsCount: linkedTests.length,
+    coverageState: linkedTests.length > 0 ? 'covered' : 'uncovered'
+  };
+}
+
 module.exports = {
   createRequirement,
   getRequirements,
+  getRequirementById,
   updateRequirement,
   getRequirementCoverage
 };
+

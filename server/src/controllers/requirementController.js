@@ -40,6 +40,15 @@ async function getRequirements(req, res, next) {
   }
 }
 
+async function getRequirement(req, res, next) {
+  try {
+    const requirement = await requirementService.getRequirementById(req.params.rid);
+    return res.status(200).json(requirement);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateRequirement(req, res, next) {
   try {
     const requirement = await requirementService.updateRequirement(
@@ -65,6 +74,8 @@ async function getCoverage(req, res, next) {
 module.exports = {
   createRequirement,
   getRequirements,
+  getRequirement,
   updateRequirement,
   getCoverage
 };
+

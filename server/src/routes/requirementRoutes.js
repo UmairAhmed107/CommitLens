@@ -13,6 +13,8 @@ router.get('/projects/:id/requirements', requireProjectRole(), requirementContro
 router.get('/projects/:id/coverage', requireProjectRole(), requirementController.getCoverage);
 
 // Entity-scoped routes
+router.get('/requirements/:rid', requireProjectRole(), requirementController.getRequirement);
 router.put('/requirements/:rid', requireProjectRole('PM'), requirementController.updateRequirement);
 
 module.exports = router;
+
