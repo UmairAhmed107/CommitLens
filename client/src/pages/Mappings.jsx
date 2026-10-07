@@ -109,7 +109,8 @@ export default function Mappings() {
                       id="mapping-pattern"
                       type="text"
                       className="form-input"
-                      data-testid="mapping-pattern"
+                      data-testid="map-pattern"
+                      data-test-alias="mapping-pattern"
                       placeholder="e.g. src/auth/**"
                       value={pattern}
                       onChange={(e) => setPattern(e.target.value)}
@@ -122,7 +123,8 @@ export default function Mappings() {
                     <select
                       id="mapping-req-select"
                       className="form-select"
-                      data-testid="mapping-req-select"
+                      data-testid="map-requirement"
+                      data-test-alias="mapping-req-select"
                       value={selectedReqId}
                       onChange={(e) => setSelectedReqId(e.target.value)}
                       required
@@ -138,7 +140,8 @@ export default function Mappings() {
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    data-testid="mapping-submit"
+                    data-testid="map-submit"
+                    data-add-btn="map-add-btn"
                     disabled={saving}
                   >
                     <Plus size={16} />
@@ -163,7 +166,7 @@ export default function Mappings() {
                 No mapping rules defined yet. Add a rule above to start automating change impact analysis.
               </div>
             ) : (
-              <table data-testid="mappings-table">
+              <table data-testid="map-table" id="mappings-table">
                 <thead>
                   <tr>
                     <th>Pattern</th>
@@ -174,7 +177,7 @@ export default function Mappings() {
                 </thead>
                 <tbody>
                   {mappings.map((m) => (
-                    <tr key={m._id} data-testid={`mapping-row-${m.pattern}`}>
+                    <tr key={m._id} data-testid={`map-row-${m.pattern}`} id={`mapping-row-${m.pattern}`}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{m.pattern}</td>
                       <td>
                         <span className="brand-badge" style={{ background: '#E0F2FE', color: '#0369A1', marginRight: '0.5rem' }}>
@@ -191,7 +194,8 @@ export default function Mappings() {
                             type="button"
                             className="btn btn-outline-danger btn-sm"
                             onClick={() => handleDeleteRule(m._id)}
-                            data-testid={`delete-mapping-${m._id}`}
+                            data-testid={`map-delete-${m._id}`}
+                            id={`delete-mapping-${m._id}`}
                             title="Delete rule"
                           >
                             <Trash2 size={14} />

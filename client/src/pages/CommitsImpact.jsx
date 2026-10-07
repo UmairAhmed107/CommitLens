@@ -175,7 +175,9 @@ export default function CommitsImpact() {
                     key={c.sha}
                     className={`commit-card-item ${isSelected ? 'selected' : ''}`}
                     onClick={() => setSelectedCommitSha(c.sha)}
-                    data-testid={`commit-item-${c.sha.slice(0, 7)}`}
+                    data-testid={`commit-card-${c.sha}`}
+                    data-short-sha={c.sha.slice(0, 7)}
+                    id={`commit-item-${c.sha.slice(0, 7)}`}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                       <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>
@@ -334,6 +336,7 @@ export default function CommitsImpact() {
                       impactData.impactedDetails.map((imp) => (
                         <div
                           key={imp.requirementId}
+                          data-testid={`impacted-req-${imp.requirementId}`}
                           style={{
                             padding: '0.75rem 1rem',
                             border: '1px solid var(--border-light)',
@@ -404,7 +407,7 @@ export default function CommitsImpact() {
                         </thead>
                         <tbody>
                           {impactData.recommendedTestDetails.map((t) => (
-                            <tr key={t._id}>
+                            <tr key={t._id} data-testid={`recommended-test-${t.testId}`}>
                               <td style={{ fontWeight: 600 }}>{t.testId}</td>
                               <td>{t.title}</td>
                               <td><Badge status={t.status} /></td>
@@ -421,6 +424,7 @@ export default function CommitsImpact() {
                                   className="btn btn-secondary btn-sm"
                                   onClick={() => openRecordModal(t)}
                                   data-testid={`run-recommended-${t.testId}`}
+                                  id={`record-result-${t.testId}`}
                                 >
                                   <PlayCircle size={14} />
                                   <span>Record Result</span>
@@ -457,6 +461,7 @@ export default function CommitsImpact() {
             <select
               id="impact-run-status"
               className="form-select"
+              data-testid="record-status-select"
               value={runStatus}
               onChange={(e) => setRunStatus(e.target.value)}
             >
@@ -473,6 +478,7 @@ export default function CommitsImpact() {
               id="impact-run-notes"
               rows={2}
               className="form-textarea"
+              data-testid="record-notes-input"
               placeholder="Result notes..."
               value={runNotes}
               onChange={(e) => setRunNotes(e.target.value)}
@@ -487,7 +493,11 @@ export default function CommitsImpact() {
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              data-testid="record-submit-btn"
+            >
               Save Result
             </button>
           </div>

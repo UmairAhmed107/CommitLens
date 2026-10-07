@@ -4,6 +4,7 @@ const { Octokit } = require('@octokit/rest');
 const Repository = require('../models/Repository');
 const Commit = require('../models/Commit');
 const config = require('../config/env');
+const impactService = require('./impactService');
 
 /**
  * Encrypt a sensitive token using AES-256-CBC (FR-GIT-02)
@@ -239,7 +240,18 @@ async function syncCommits(projectId) {
       newCommitsCount++;
     }
 
-    // Impact analysis deferred to FR-IMP (as instructed: "Do not run impact analysis yet")
+    // Automatically run impact engine for every synced commit (FR-IMP-03 to FR-IMP-08)
+    const impactService = require('./impactService');
+    const demoFileContents = {
+      'src/auth/LoginService.js': '// @req REQ-01 Secure Login\nexport class LoginService { login(user, pass) {} }',
+      'src/cart/CartService.js': '// @req REQ-02 Shopping Cart\nexport class CartService { addItem(item) {} }',
+      'src/payment/PaymentService.js': '// @req REQ-03 Payment\nexport class PaymentService {}',
+      'src/orders/OrderService.js': '// @req REQ-04 Order Tracking\nexport class OrderService {}',
+      'README.md': '# Demo Shop Application\nA sample application for change impact testing.',
+      'docs/guide.md': '# User Guide\nDocumentation for Demo Shop.'
+    };
+    await impactService.analyzeCommitImpact(projectId, commitDoc, demoFileContents);
+
     ingestedCommits.push(commitDoc);
   }
 

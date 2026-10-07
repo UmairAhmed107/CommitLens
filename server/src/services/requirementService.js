@@ -15,7 +15,7 @@ async function createRequirement(projectId, { title, description, type, priority
     reqId,
     title: title.trim(),
     description: description ? description.trim() : '',
-    type: type || 'functional',
+    type: (type || 'functional').toLowerCase(),
     priority: priority || 'Medium',
     status: status || 'Active',
     version: 1,

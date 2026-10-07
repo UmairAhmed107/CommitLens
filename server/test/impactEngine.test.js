@@ -1,59 +1,124 @@
-// Unit Tests for Impact Engine & Calculations (Test Plan Section 8: UT-01 to UT-08)
-const test = require('node:test');
-const assert = require('node:assert');
+// Mocha Unit Tests for Impact Engine (Test Plan Section 8: UT-01 to UT-08)
+const { expect } = require('chai');
 const {
   matchesPattern,
-  scanContentForReqTags,
+  matchPatterns,
+  scanTags,
   calculateReductionPercentage,
-  calculateCoveragePercentage
-} = require('../src/services/impactService');
+  calculateCoveragePercentage,
+  computeImpact
+} = require('../src/services/impactEngine');
 
-test('UT-01: Pattern matcher matches valid path', () => {
-  const result = matchesPattern('src/auth/LoginService.js', 'src/auth/**');
-  assert.strictEqual(result, true, 'LoginService.js should match src/auth/**');
-});
+describe('Impact Engine Unit Tests (Test Plan UT-01 to UT-08)', () => {
+  // UT-01: Pattern matcher - match valid path
+  it('UT-01: matchesPattern should return true for src/auth/LoginService.js against src/auth/**', () => {
+    const matched = matchesPattern('src/auth/LoginService.js', 'src/auth/**');
+    expect(matched).to.be.true;
+  });
 
-test('UT-02: Pattern matcher rejects non-matching path', () => {
-  const result = matchesPattern('src/cart/CartService.js', 'src/auth/**');
-  assert.strictEqual(result, false, 'CartService.js should not match src/auth/**');
-});
+  // UT-02: Pattern matcher - reject non-matching path
+  it('UT-02: matchesPattern should return false for src/cart/CartService.js against src/auth/**', () => {
+    const matched = matchesPattern('src/cart/CartService.js', 'src/auth/**');
+    expect(matched).to.be.false;
+  });
 
-test('UT-03: Tag scanner extracts @req tag from file content', () => {
-  const content = `
-    // User login service
-    // @req REQ-01
-    export class LoginService {}
-  `;
-  const tags = scanContentForReqTags(content);
-  assert.deepStrictEqual(tags, ['REQ-01']);
-});
+  // UT-03: Tag scanner - extracts REQ-01 from comment
+  it('UT-03: scanTags should return [\'REQ-01\'] for file text containing // @req REQ-01', () => {
+    const fileContent = `
+      // Authentication helper
+      // @req REQ-01
+      export class LoginService {
+        login() {}
+      }
+    `;
+    const tags = scanTags(fileContent);
+    expect(tags).to.deep.equal(['REQ-01']);
+  });
 
-test('UT-04: Tag scanner returns empty array when no tag is present', () => {
-  const content = 'console.log("no requirement annotations here");';
-  const tags = scanContentForReqTags(content);
-  assert.deepStrictEqual(tags, []);
-});
+  // UT-04: Tag scanner - returns empty array for file without tag
+  it('UT-04: scanTags should return [] for file with no requirement tag', () => {
+    const fileContent = `
+      // General utility without annotations
+      export function add(a, b) {
+        return a + b;
+      }
+    `;
+    const tags = scanTags(fileContent);
+    expect(tags).to.deep.equal([]);
+  });
 
-test('UT-05: Tag scanner extracts multiple distinct tags', () => {
-  const content = `
-    /*
-     * @req REQ-01
-     * @req REQ-02
-     */
-  `;
-  const tags = scanContentForReqTags(content);
-  assert.strictEqual(tags.includes('REQ-01'), true);
-  assert.strictEqual(tags.includes('REQ-02'), true);
-});
+  // UT-05: Impact engine - two files matching two requirements returns union of tests
+  it('UT-05: computeImpact with two files matching two requirements returns union of both requirements\' tests', () => {
+    const commit = {
+      sha: 'commit-ut-05',
+      files: [
+        { path: 'src/auth/LoginService.js', status: 'modified' },
+        { path: 'src/cart/CartService.js', status: 'modified' }
+      ]
+    };
 
-test('UT-07: Reduction percentage calculation', () => {
-  // 3 recommended out of 8 total tests = 62.5% reduction
-  const reduction = calculateReductionPercentage(3, 8);
-  assert.strictEqual(reduction, 62.5);
-});
+    const rules = [
+      { pattern: 'src/auth/**', requirementId: 'REQ-01' },
+      { pattern: 'src/cart/**', requirementId: 'REQ-02' }
+    ];
 
-test('UT-08: Requirement coverage percentage calculation', () => {
-  // 3 covered out of 4 total requirements = 75% coverage
-  const coverage = calculateCoveragePercentage(3, 4);
-  assert.strictEqual(coverage, 75);
+    const tests = [
+      { testId: 'TC-01', requirementIds: ['REQ-01'] },
+      { testId: 'TC-02', requirementIds: ['REQ-01'] },
+      { testId: 'TC-03', requirementIds: ['REQ-02'] },
+      { testId: 'TC-04', requirementIds: ['REQ-03'] }
+    ];
+
+    const result = computeImpact(commit, rules, tests);
+
+    expect(result.impactedRequirements).to.include.members(['REQ-01', 'REQ-02']);
+    // Union of REQ-01 (TC-01, TC-02) and REQ-02 (TC-03)
+    expect(result.recommendedTestIds).to.deep.equal(['TC-01', 'TC-02', 'TC-03']);
+    expect(result.recommendedTestIds).to.not.include('TC-04');
+    expect(result.unmappedFiles).to.deep.equal([]);
+  });
+
+  // UT-06: Impact engine - same requirement matched by pattern and tag produces one requirement with two reasons
+  it('UT-06: computeImpact when requirement is matched by pattern and tag returns one requirement with two reasons [\'pattern\', \'tag\']', () => {
+    const commit = {
+      sha: 'commit-ut-06',
+      files: [
+        {
+          path: 'src/auth/LoginService.js',
+          status: 'modified',
+          content: '// @req REQ-01\nexport class LoginService {}'
+        }
+      ]
+    };
+
+    const rules = [
+      { pattern: 'src/auth/**', requirementId: 'REQ-01' }
+    ];
+
+    const tests = [
+      { testId: 'TC-01', requirementIds: ['REQ-01'] }
+    ];
+
+    const result = computeImpact(commit, rules, tests);
+
+    // Must return exactly one impacted requirement
+    expect(result.impacted).to.have.lengthOf(1);
+    const impactedReq = result.impacted[0];
+    expect(impactedReq.requirementId).to.equal('REQ-01');
+    expect(impactedReq.reasons).to.include('pattern');
+    expect(impactedReq.reasons).to.include('tag');
+    expect(impactedReq.reasons).to.have.lengthOf(2);
+  });
+
+  // UT-07: Reduction percentage calculator - 3 of 8 total = 62.5%
+  it('UT-07: calculateReductionPercentage should return 62.5 for 3 recommended tests of 8 total', () => {
+    const reduction = calculateReductionPercentage(3, 8);
+    expect(reduction).to.equal(62.5);
+  });
+
+  // UT-08: Coverage percentage calculator - 3 of 4 requirements = 75%
+  it('UT-08: calculateCoveragePercentage should return 75 for 3 covered requirements of 4 total', () => {
+    const coverage = calculateCoveragePercentage(3, 4);
+    expect(coverage).to.equal(75);
+  });
 });
