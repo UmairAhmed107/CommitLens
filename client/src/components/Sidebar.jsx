@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar() {
-  const { userRole } = useProject();
+  const { userRole, projects } = useProject();
 
   // Navigation map definitions per UI Spec Section 2
   const navItems = [
@@ -80,10 +80,11 @@ export default function Sidebar() {
       path: '/projects',
       icon: Users,
       testId: 'nav-projects',
-      // Visible only to PM and TL
-      allowed: userRole === 'PM' || userRole === 'TL'
+      // Visible only to PM and TL (or brand new users setting up initial project)
+      allowed: userRole === 'PM' || userRole === 'TL' || (projects && projects.length === 0)
     }
   ];
+
 
   return (
     <aside className="sidebar">

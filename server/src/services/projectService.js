@@ -149,9 +149,40 @@ async function addMember(projectId, { email, role }) {
   ]);
 }
 
+/**
+ * Edit or archive a project (FR-PRJ-01)
+ */
+async function updateProject(projectId, { name, description, status }) {
+  const project = await Project.findById(projectId);
+  if (!project) {
+    const err = new Error('Project not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (name !== undefined) {
+    project.name = name.trim();
+  }
+  if (description !== undefined) {
+    project.description = description.trim();
+  }
+  if (status !== undefined) {
+    project.status = status;
+  }
+
+  await project.save();
+
+  return project.populate([
+    { path: 'ownerId', select: 'name email' },
+    { path: 'members.userId', select: 'name email' }
+  ]);
+}
+
 module.exports = {
   createProject,
   getUserProjects,
   getProjectById,
-  addMember
+  addMember,
+  updateProject
 };
+

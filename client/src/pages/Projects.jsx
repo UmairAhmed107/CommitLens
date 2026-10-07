@@ -5,7 +5,8 @@ import { useProject } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import AccessDenied from '../components/AccessDenied';
-import { Plus, Users, UserPlus, Layers, CheckCircle2 } from 'lucide-react';
+import { Plus, Users, UserPlus, Layers, CheckCircle2, Edit3, Archive } from 'lucide-react';
+
 
 export default function Projects() {
   const { user } = useAuth();
@@ -25,6 +26,13 @@ export default function Projects() {
   // Active Project Detail
   const [currentProjectDetails, setCurrentProjectDetails] = useState(null);
 
+  // Edit / Archive Project State (FR-PRJ-01)
+  const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editStatus, setEditStatus] = useState('Active');
+  const [editError, setEditError] = useState('');
+
   // Enforcement for UI-03: If user is QA or DEV and tries to access project management, show Access Denied!
   const isAuthorized = userRole === 'PM' || userRole === 'TL' || projects.length === 0;
 
@@ -34,6 +42,9 @@ export default function Projects() {
         try {
           const res = await api.get(`/projects/${activeProject._id}`);
           setCurrentProjectDetails(res.data);
+          setEditName(res.data.name || '');
+          setEditDesc(res.data.description || '');
+          setEditStatus(res.data.status || 'Active');
         } catch (err) {
           console.error('[Project Details Error]', err);
         }
@@ -70,6 +81,31 @@ export default function Projects() {
     }
   };
 
+  const handleUpdateProject = async (e) => {
+
+    e.preventDefault();
+    setEditError('');
+
+    if (!editName.trim()) {
+      setEditError('Project name is required');
+      return;
+    }
+
+    try {
+      const res = await api.put(`/projects/${activeProject._id}`, {
+        name: editName.trim(),
+        description: editDesc.trim(),
+        status: editStatus
+      });
+      setIsEditProjectModalOpen(false);
+      setCurrentProjectDetails(res.data);
+      await fetchProjects();
+      switchProject(res.data);
+    } catch (err) {
+      setEditError(err.response?.data?.details?.[0] || err.message || 'Failed to update project');
+    }
+  };
+
   const handleAddMember = async (e) => {
     e.preventDefault();
     setMemberError('');
@@ -95,7 +131,7 @@ export default function Projects() {
     }
   };
 
-  const isPM = userRole === 'PM';
+  const isPM = userRole === 'PM' || projects.length === 0;
 
   return (
     <div>
@@ -106,6 +142,7 @@ export default function Projects() {
           </span>
           <h1 className="serif-heading">Projects & Team Members</h1>
         </div>
+
 
         {/* New Project button: PM only (UI Spec 3.2, UI-04) */}
         {isPM && (
@@ -149,11 +186,22 @@ export default function Projects() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>{p.name}</h3>
-                  {isActive && (
-                    <span className="brand-badge" style={{ background: '#ECFDF5', color: '#065F46' }}>
-                      Active
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    {p.status === 'Archived' ? (
+                      <span className="brand-badge" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                        Archived
+                      </span>
+                    ) : (
+                      <span className="brand-badge" style={{ background: '#ECFDF5', color: '#065F46' }}>
+                        Active
+                      </span>
+                    )}
+                    {isActive && (
+                      <span className="brand-badge" style={{ background: '#E0F2FE', color: '#0369A1' }}>
+                        Selected
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', minHeight: '38px' }}>
@@ -185,29 +233,53 @@ export default function Projects() {
         <div className="card">
           <div className="card-header">
             <div>
-              <h2 className="serif-heading" style={{ fontSize: '1.25rem' }}>
-                Team Members - {currentProjectDetails.name}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <h2 className="serif-heading" style={{ fontSize: '1.25rem' }}>
+                  Team Members - {currentProjectDetails.name}
+                </h2>
+                {currentProjectDetails.status === 'Archived' && (
+                  <span className="brand-badge" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                    Archived Project
+                  </span>
+                )}
+              </div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Role-based access assigned per project
               </span>
             </div>
 
             {isPM && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                data-testid="add-member-btn"
-                onClick={() => {
-                  setMemberEmail('');
-                  setMemberRole('DEV');
-                  setMemberError('');
-                  setIsAddMemberModalOpen(true);
-                }}
-              >
-                <UserPlus size={15} />
-                <span>Add Member</span>
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  data-testid="edit-project-btn"
+                  onClick={() => {
+                    setEditName(currentProjectDetails.name || '');
+                    setEditDesc(currentProjectDetails.description || '');
+                    setEditStatus(currentProjectDetails.status || 'Active');
+                    setEditError('');
+                    setIsEditProjectModalOpen(true);
+                  }}
+                >
+                  <Edit3 size={15} />
+                  <span>Edit Project</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  data-testid="add-member-btn"
+                  onClick={() => {
+                    setMemberEmail('');
+                    setMemberRole('DEV');
+                    setMemberError('');
+                    setIsAddMemberModalOpen(true);
+                  }}
+                >
+                  <UserPlus size={15} />
+                  <span>Add Member</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -365,6 +437,80 @@ export default function Projects() {
           </div>
         </form>
       </Modal>
+
+      {/* Edit / Archive Project Modal (PM Only, FR-PRJ-01) */}
+      <Modal
+        isOpen={isEditProjectModalOpen}
+        onClose={() => setIsEditProjectModalOpen(false)}
+        title={`Edit Project - ${currentProjectDetails?.name}`}
+      >
+        {editError && (
+          <div className="alert-banner alert-error">
+            <span>{editError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleUpdateProject}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="edit-project-name">Project Name</label>
+            <input
+              id="edit-project-name"
+              type="text"
+              className="form-input"
+              data-testid="edit-project-name"
+              placeholder="e.g. demo-shop"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="edit-project-desc">Description</label>
+            <textarea
+              id="edit-project-desc"
+              rows={3}
+              className="form-textarea"
+              data-testid="edit-project-desc"
+              placeholder="Project purpose, goals, and scope..."
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="edit-project-status">Project Status</label>
+            <select
+              id="edit-project-status"
+              className="form-select"
+              data-testid="edit-project-status"
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value)}
+            >
+              <option value="Active">Active (Available for development & testing)</option>
+              <option value="Archived">Archived (Read-only / closed)</option>
+            </select>
+          </div>
+
+          <div className="modal-footer">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsEditProjectModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              data-testid="edit-project-submit"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
+
