@@ -1,0 +1,33 @@
+{
+  "name": "scit-server",
+  "version": "1.0.0",
+  "description": "Smart Change Impact & Test Management System - Express Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "seed": "node src/scripts/seed.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "keywords": [
+    "impact-analysis",
+    "test-management",
+    "rtm",
+    "express",
+    "mongodb"
+  ],
+  "author": "SCIT Team",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "minimatch": "^9.0.5",
+    "mongodb-memory-server": "^10.1.2",
+    "mongoose": "^8.8.2",
+    "pdfkit": "^0.15.1"
+  }
+}

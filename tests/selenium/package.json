@@ -1,0 +1,20 @@
+{
+  "name": "scit-selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium WebDriver UI Automation Test Suite for SCIT System",
+  "main": "specs/auth.spec.js",
+  "scripts": {
+    "test": "node --test specs/**/*.test.js"
+  },
+  "keywords": [
+    "selenium",
+    "automation",
+    "qa",
+    "scit"
+  ],
+  "author": "SCIT QA Team",
+  "license": "ISC",
+  "dependencies": {
+    "selenium-webdriver": "^4.27.0"
+  }
+}
