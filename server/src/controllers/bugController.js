@@ -40,9 +40,18 @@ async function getBugs(req, res, next) {
   }
 }
 
+async function getBugById(req, res, next) {
+  try {
+    const bug = await bugService.getBugById(req.params.bid);
+    return res.status(200).json(bug);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateBug(req, res, next) {
   try {
-    const bug = await bugService.updateBug(req.params.bid, req.body);
+    const bug = await bugService.updateBug(req.params.bid, req.body, req.user._id);
     return res.status(200).json(bug);
   } catch (err) {
     next(err);
@@ -52,5 +61,6 @@ async function updateBug(req, res, next) {
 module.exports = {
   createBug,
   getBugs,
+  getBugById,
   updateBug
 };

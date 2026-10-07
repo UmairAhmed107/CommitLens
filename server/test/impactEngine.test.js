@@ -121,4 +121,86 @@ describe('Impact Engine Unit Tests (Test Plan UT-01 to UT-08)', () => {
     const coverage = calculateCoveragePercentage(3, 4);
     expect(coverage).to.equal(75);
   });
+
+  // Section 3 Algorithm Pure Functions & Edge Cases
+  describe('Section 3 Algorithm Pure Functions & Edge Cases', () => {
+    it('matchPatterns: matches multiple files against multiple rules', () => {
+      const files = ['src/auth/LoginService.js', 'src/cart/CartService.js', 'README.md'];
+      const rules = [
+        { pattern: 'src/auth/**', requirementId: 'REQ-01' },
+        { pattern: 'src/cart/**', requirementId: 'REQ-02' }
+      ];
+      const result = matchPatterns(files, rules);
+      expect(result.matches).to.have.lengthOf(2);
+      expect(result.matchedFiles).to.deep.equal(['src/auth/LoginService.js', 'src/cart/CartService.js']);
+      expect(result.matchedRequirements).to.deep.equal(['REQ-01', 'REQ-02']);
+      expect(result.requirementMap['REQ-01']).to.deep.equal(['src/auth/LoginService.js']);
+    });
+
+    it('scanTags: scans an object mapping of file paths to content', () => {
+      const fileContents = {
+        'src/auth/LoginService.js': '// @req REQ-01\nexport class LoginService {}',
+        'src/cart/CartService.js': '// @req REQ-02 Shopping cart\nexport class CartService {}',
+        'README.md': '# Readme with no tags'
+      };
+      const result = scanTags(fileContents);
+      expect(result.requirementIds).to.deep.equal(['REQ-01', 'REQ-02']);
+      expect(result.tagMap['REQ-01']).to.deep.equal(['src/auth/LoginService.js']);
+      expect(result.tagMap['REQ-02']).to.deep.equal(['src/cart/CartService.js']);
+    });
+
+    it('computeImpact: commit with no matches returns empty recommendation and lists all files as unmapped', () => {
+      const commit = {
+        sha: 'c-unmapped',
+        files: ['README.md', 'docs/architecture.png']
+      };
+      const rules = [{ pattern: 'src/auth/**', requirementId: 'REQ-01' }];
+      const tests = [{ testId: 'TC-01', requirementIds: ['REQ-01'] }];
+
+      const result = computeImpact(commit, rules, tests);
+      expect(result.impacted).to.be.an('array').that.is.empty;
+      expect(result.recommendedTestIds).to.be.an('array').that.is.empty;
+      expect(result.unmappedFiles).to.deep.equal(['README.md', 'docs/architecture.png']);
+      expect(result.reductionPct).to.equal(100);
+    });
+
+    it('computeImpact: ignores missing tag target (REQ-99 does not exist) when validReqIds provided', () => {
+      const commit = {
+        sha: 'c-missing-tag',
+        files: [
+          {
+            path: 'src/utils/Helper.js',
+            status: 'modified',
+            content: '// @req REQ-99 Nonexistent requirement\nexport function help() {}'
+          }
+        ]
+      };
+      const rules = [];
+      const tests = [{ testId: 'TC-01', requirementIds: ['REQ-01'] }];
+      const validReqIds = ['REQ-01', 'REQ-02'];
+
+      const result = computeImpact(commit, rules, tests, {}, validReqIds);
+      expect(result.impacted).to.be.an('array').that.is.empty;
+      expect(result.recommendedTestIds).to.be.an('array').that.is.empty;
+      expect(result.unmappedFiles).to.deep.equal(['src/utils/Helper.js']);
+    });
+
+    it('computeImpact: does not scan removed files for tags', () => {
+      const commit = {
+        sha: 'c-removed-file',
+        files: [
+          {
+            path: 'src/auth/OldService.js',
+            status: 'removed',
+            content: '// @req REQ-01 Removed'
+          }
+        ]
+      };
+      const rules = [];
+      const tests = [{ testId: 'TC-01', requirementIds: ['REQ-01'] }];
+
+      const result = computeImpact(commit, rules, tests);
+      expect(result.impacted).to.be.an('array').that.is.empty;
+    });
+  });
 });

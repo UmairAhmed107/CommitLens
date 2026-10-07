@@ -1,7 +1,7 @@
-// Commits and Impact Analysis - Core Screen (FR-GIT-06, FR-IMP-03 to FR-IMP-08, UI-11, UI-12, UI Spec 3.8 & 4)
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useProject } from '../context/ProjectContext';
+import { useNavigate } from 'react-router-dom';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
 import {
@@ -12,11 +12,13 @@ import {
   CheckCircle,
   Percent,
   RefreshCw,
-  Search
+  Search,
+  Bug
 } from 'lucide-react';
 
 export default function CommitsImpact() {
   const { activeProject, userRole, isSyncing, triggerSync } = useProject();
+  const navigate = useNavigate();
 
   const [commits, setCommits] = useState([]);
   const [selectedCommitSha, setSelectedCommitSha] = useState(null);
@@ -419,16 +421,32 @@ export default function CommitsImpact() {
                                 )}
                               </td>
                               <td>
-                                <button
-                                  type="button"
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={() => openRecordModal(t)}
-                                  data-testid={`run-recommended-${t.testId}`}
-                                  id={`record-result-${t.testId}`}
-                                >
-                                  <PlayCircle size={14} />
-                                  <span>Record Result</span>
-                                </button>
+                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => openRecordModal(t)}
+                                    data-testid={`run-recommended-${t.testId}`}
+                                    id={`record-result-${t.testId}`}
+                                  >
+                                    <PlayCircle size={14} />
+                                    <span>Record Result</span>
+                                  </button>
+
+                                  {t.status === 'Failed' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-danger btn-sm"
+                                      onClick={() => navigate(`/bugs?createFrom=${t.testId}`)}
+                                      data-testid={`bug-recommended-${t.testId}`}
+                                      id={`create-bug-rec-${t.testId}`}
+                                      title="Report bug from this failed test"
+                                    >
+                                      <Bug size={14} />
+                                      <span>Create Bug</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))}

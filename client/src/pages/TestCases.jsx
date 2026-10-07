@@ -398,10 +398,12 @@ export default function TestCases() {
                           className="btn btn-outline-danger btn-sm"
                           onClick={() => navigate(`/bugs?createFrom=${t.testId}`)}
                           data-testid={`create-bug-btn-${t.testId}`}
+                          id={`create-bug-btn-${t.testId}`}
+                          data-action="create-bug"
                           title="Report bug from this failed test"
                         >
                           <Bug size={14} />
-                          <span>Bug</span>
+                          <span>Create Bug</span>
                         </button>
                       )}
                     </div>
@@ -599,6 +601,20 @@ export default function TestCases() {
             >
               Cancel
             </button>
+            {runStatus === 'Failed' && (
+              <button
+                type="button"
+                className="btn btn-outline-danger"
+                onClick={async (e) => {
+                  await handleRecordSubmit(e);
+                  navigate(`/bugs?createFrom=${activeTestForRun.testId}`);
+                }}
+                data-testid="run-save-and-create-bug"
+              >
+                <Bug size={14} />
+                <span>Save & Create Bug</span>
+              </button>
+            )}
             <button
               type="submit"
               className="btn btn-primary"

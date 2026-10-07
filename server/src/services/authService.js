@@ -46,6 +46,7 @@ async function register({ name, email, password }) {
   return {
     token,
     user: {
+      _id: user._id,
       id: user._id,
       name: user.name,
       email: user.email,
@@ -79,6 +80,7 @@ async function login({ email, password }) {
   return {
     token,
     user: {
+      _id: user._id,
       id: user._id,
       name: user.name,
       email: user.email,

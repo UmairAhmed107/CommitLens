@@ -51,6 +51,21 @@ const bugSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  history: [
+    {
+      fromStatus: String,
+      toStatus: String,
+      changedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      changedAt: {
+        type: Date,
+        default: Date.now
+      },
+      notes: String
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now

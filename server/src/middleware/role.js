@@ -42,7 +42,10 @@ async function resolveProjectId(req) {
 
   // If modifying a bug by :bid
   if (req.params.bid) {
-    const bugDoc = await Bug.findById(req.params.bid);
+    const isObjectId = mongoose.isValidObjectId(req.params.bid);
+    const bugDoc = isObjectId
+      ? await Bug.findById(req.params.bid)
+      : await Bug.findOne({ bugId: req.params.bid });
     return bugDoc ? bugDoc.projectId : null;
   }
 

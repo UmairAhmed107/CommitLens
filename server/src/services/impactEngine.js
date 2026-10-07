@@ -50,6 +50,7 @@ function matchPatterns(files, rules) {
   return {
     matches,
     matchedFiles: Array.from(matchedFiles),
+    matchedRequirements: Object.keys(requirementMap),
     requirementMap: Object.fromEntries(
       Object.entries(requirementMap).map(([k, set]) => [k, Array.from(set)])
     )
@@ -176,7 +177,8 @@ function computeImpact(commit, rules = [], tests = [], fileContents = {}, validR
 
     // 2. Tag scanning (only for files not marked 'removed')
     if (file.status !== 'removed') {
-      const content = (file.content !== undefined ? file.content : fileContents[filePath]) || '';
+      const commitFileContents = commit?.fileContents || {};
+      const content = (file.content !== undefined ? file.content : (fileContents[filePath] || commitFileContents[filePath])) || '';
       const tags = scanTags(content);
       for (const tag of tags) {
         let targetReqId = tag;
@@ -205,6 +207,10 @@ function computeImpact(commit, rules = [], tests = [], fileContents = {}, validR
               break;
             }
           }
+        }
+
+        if (!isValid && validSet) {
+          console.warn(`[Impact Engine] Ignoring tag ${tag}: requirement does not exist in project.`);
         }
 
         if (isValid) {

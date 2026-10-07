@@ -1,4 +1,5 @@
 // Bug Management Service (FR-BUG-01 to FR-BUG-05)
+const mongoose = require('mongoose');
 const Bug = require('../models/Bug');
 const Counter = require('../models/Counter');
 
@@ -41,7 +42,13 @@ async function getBugs(projectId, { status, severity, assignee, search }) {
 
   if (status) query.status = status;
   if (severity) query.severity = severity;
-  if (assignee) query.assignedTo = assignee;
+  if (assignee) {
+    if (assignee === 'unassigned') {
+      query.assignedTo = null;
+    } else {
+      query.assignedTo = assignee;
+    }
+  }
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: 'i' } },
@@ -59,10 +66,36 @@ async function getBugs(projectId, { status, severity, assignee, search }) {
 }
 
 /**
+ * Get single bug by ID or bugId
+ */
+async function getBugById(bugIdentifier) {
+  const isObjectId = mongoose.isValidObjectId(bugIdentifier);
+  const bug = isObjectId
+    ? await Bug.findById(bugIdentifier)
+    : await Bug.findOne({ bugId: bugIdentifier });
+
+  if (!bug) {
+    const err = new Error('Bug not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return bug.populate([
+    { path: 'reportedBy', select: 'name email' },
+    { path: 'assignedTo', select: 'name email' },
+    { path: 'history.changedBy', select: 'name email' }
+  ]);
+}
+
+/**
  * Update bug details, assignee, or status (FR-BUG-03, FR-BUG-04)
  */
-async function updateBug(bugId, updates) {
-  const bug = await Bug.findById(bugId);
+async function updateBug(bugIdentifier, updates, userId = null) {
+  const isObjectId = mongoose.isValidObjectId(bugIdentifier);
+  const bug = isObjectId
+    ? await Bug.findById(bugIdentifier)
+    : await Bug.findOne({ bugId: bugIdentifier });
+
   if (!bug) {
     const err = new Error('Bug not found');
     err.statusCode = 404;
@@ -73,7 +106,9 @@ async function updateBug(bugId, updates) {
   if (updates.description !== undefined) bug.description = updates.description.trim();
   if (updates.severity !== undefined) bug.severity = updates.severity;
   if (updates.priority !== undefined) bug.priority = updates.priority;
-  if (updates.assignedTo !== undefined) bug.assignedTo = updates.assignedTo || null;
+  if (updates.assignedTo !== undefined) {
+    bug.assignedTo = updates.assignedTo && updates.assignedTo !== 'unassigned' ? updates.assignedTo : null;
+  }
 
   if (updates.status !== undefined) {
     if (!STATUS_ORDER.includes(updates.status)) {
@@ -82,20 +117,33 @@ async function updateBug(bugId, updates) {
       err.details = [`Status must be one of: ${STATUS_ORDER.join(', ')}`];
       throw err;
     }
-    bug.status = updates.status;
+
+    if (bug.status !== updates.status) {
+      if (!bug.history) bug.history = [];
+      bug.history.push({
+        fromStatus: bug.status,
+        toStatus: updates.status,
+        changedBy: userId || null,
+        changedAt: new Date(),
+        notes: updates.notes || `Status updated from ${bug.status} to ${updates.status}`
+      });
+      bug.status = updates.status;
+    }
   }
 
   await bug.save();
 
   return bug.populate([
     { path: 'reportedBy', select: 'name email' },
-    { path: 'assignedTo', select: 'name email' }
+    { path: 'assignedTo', select: 'name email' },
+    { path: 'history.changedBy', select: 'name email' }
   ]);
 }
 
 module.exports = {
   createBug,
   getBugs,
+  getBugById,
   updateBug,
   STATUS_ORDER
 };

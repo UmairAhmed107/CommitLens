@@ -24,6 +24,10 @@ async function startServer() {
       console.log(`=======================================================`);
     });
 
+    server.on('error', (err) => {
+      console.error('[Server Error]', err);
+    });
+
     // Handle process termination gracefully
     const shutdown = async () => {
       console.log('\n[Server] Shutting down gracefully...');
@@ -35,6 +39,12 @@ async function startServer() {
 
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
+    process.on('uncaughtException', (err) => {
+      console.error('[Uncaught Exception]', err);
+    });
+    process.on('unhandledRejection', (reason) => {
+      console.error('[Unhandled Rejection]', reason);
+    });
   } catch (err) {
     console.error('[Server] Fatal startup error:', err);
     process.exit(1);
